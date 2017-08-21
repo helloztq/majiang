@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bufio"
+	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net/url"
 	"os"
@@ -12,6 +15,11 @@ import (
 )
 
 var addr = flag.String("addr", "localhost:8080", "http service address")
+
+type RequestInfo struct {
+	Cmd   string `json:"cmd"`
+	Param string `json:"param"`
+}
 
 func main() {
 	flag.Parse()
@@ -45,17 +53,37 @@ func main() {
 		}
 	}()
 
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
+	go func() {
+		var scanner = bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			info := RequestInfo{
+				Cmd:   "a",
+				Param: "bc"}
+
+			log.Println(info)
+			buff, err := json.Marshal(info)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+			}
+			log.Println("request", string(buff[:]), len(buff))
+			c.WriteMessage(websocket.TextMessage, buff)
+		}
+		if err := scanner.Err(); err != nil {
+			fmt.Fprintln(os.Stderr, "reading standard input: ", err)
+		}
+	}()
+
+	// ticker := time.NewTicker(time.Second)
+	// defer ticker.Stop()
 
 	for {
 		select {
-		case t := <-ticker.C:
-			err := c.WriteMessage(websocket.TextMessage, []byte(t.String()))
-			if err != nil {
-				log.Println("write:", err)
-				return
-			}
+		// case t := <-ticker.C:
+		// 	err := c.WriteMessage(websocket.TextMessage, []byte(t.String()))
+		// 	if err != nil {
+		// 		log.Println("write:", err)
+		// 		return
+		// 	}
 		case <-interrupt:
 			log.Println("interrupt")
 			// To cleanly close a connection, a client should send a close
